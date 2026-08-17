@@ -881,6 +881,17 @@ reset_ak() {
 setup_ak() {
   local blockfiles plistboot plistinit plistreco parttype name part mtdmount mtdpart mtdname target;
 
+  # Backwards compatibility for old API
+  [ "$block" ] && BLOCK="$block";
+  [ "$is_slot_device" ] && IS_SLOT_DEVICE="$is_slot_device";
+  [ "$ramdisk_compression" ] && RAMDISK_COMPRESSION="$ramdisk_compression";
+  [ "$patch_vbmeta_flag" ] && PATCH_VBMETA_FLAG="$patch_vbmeta_flag";
+  [ "$customdd" ] && CUSTOMDD="$customdd";
+  [ "$slot_select" ] && SLOT_SELECT="$slot_select";
+  [ "$no_block_display" ] && NO_BLOCK_DISPLAY="$no_block_display";
+  [ "$no_magisk_check" ] && NO_MAGISK_CHECK="$no_magisk_check";
+  unset block is_slot_device ramdisk_compression patch_vbmeta_flag customdd slot_select no_block_display no_magisk_check;
+
   # slot detection enabled by IS_SLOT_DEVICE=1 or auto (from anykernel.sh)
   case $IS_SLOT_DEVICE in
     1|auto)
@@ -1070,7 +1081,7 @@ do_check_boot_version() {
   if [ "$(file_getprop anykernel.sh do.check_boot_version)" != 1 ]; then
     ui_print "  -> [SKIPPED] do.check_boot_version=0: version check SKIPPED."
     ui_print "  -> [SKIPPED] Forced flash. Proceed with caution!"
-    return 1
+    return 0
   fi
 
   local new_ver dev_ver new_kver new_abranch dev_kver dev_abranch
