@@ -1,0 +1,105 @@
+{
+  "model": "OP12-CUSTOM",
+  "soc": "pineapple",
+  "branch": "wild/sm8650",
+  "os_version": "A16",
+  "kernel_version": "6.1",
+  "root_solution": "KernelSU-Next v3.3.0",
+  "features": [
+    {
+      "key": "susfs",
+      "name": "SUSFS (v2.2.0)",
+      "desc": "Kernel-level root & mount hiding subsystem"
+    },
+    {
+      "key": "nomount",
+      "name": "NoMount",
+      "desc": "Official mountless VFS isolation driver"
+    },
+    {
+      "key": "opt",
+      "name": "Kernel Optimisations",
+      "desc": "25+ memory, CPU scheduler & I/O latency patches"
+    },
+    {
+      "key": "bbg",
+      "name": "Baseband Guard (BBG)",
+      "desc": "Security LSM protecting modem baseband memory"
+    },
+    {
+      "key": "bbr3",
+      "name": "BBRv3 TCP",
+      "desc": "Latest BBRv3 congestion control (default cong: bbr3)"
+    },
+    {
+      "key": "ntsync",
+      "name": "NTSync",
+      "desc": "Fast Windows NT sync primitives for Wine/Proton"
+    },
+    {
+      "key": "lz4kd",
+      "name": "LZ4KD Compressor",
+      "desc": "Ultra-fast ZRAM decompression engine"
+    },
+    {
+      "key": "zram_writeback",
+      "name": "ZRAM Writeback",
+      "desc": "Idle ZRAM page writeback to block storage"
+    },
+    {
+      "key": "show_all_algos",
+      "name": "All ZRAM Algorithms",
+      "desc": "Full suite of compression algorithms (lz4hc, 842, etc.)"
+    },
+    {
+      "key": "rekernel",
+      "name": "Re:Kernel",
+      "desc": "Netlink/freezer binder hooks for background efficiency"
+    },
+    {
+      "key": "cve",
+      "name": "CVE Security Fixes",
+      "desc": "GhostLock rtmutex and upstream vulnerability patches"
+    },
+    {
+      "key": "ip_set",
+      "name": "IPSet & IPv6 NAT",
+      "desc": "High-performance firewall packet filtering & NAT"
+    },
+    {
+      "key": "ttl",
+      "name": "TTL / Hop Limit Target",
+      "desc": "Packet TTL network targeting support"
+    },
+    {
+      "key": "unicode",
+      "name": "Unicode Path Fix",
+      "desc": "Unicode filename path normalization filter"
+    },
+    {
+      "key": "polly",
+      "name": "LLVM POLLY",
+      "desc": "Polyhedral loop optimizer for auto-vectorization"
+    },
+    {
+      "key": "pelt",
+      "name": "PELT Optimization",
+      "desc": "Per-Entity Load Tracking scheduler responsiveness"
+    },
+    {
+      "key": "disable_module_crc_check",
+      "name": "Module CRC Bypass",
+      "desc": "Allows loading custom vendor kernel modules"
+    },
+    {
+      "key": "ds",
+      "name": "DroidSpaces Support",
+      "desc": "Container namespace and isolation enhancements"
+    },
+    {
+      "key": "ds_ext",
+      "name": "DroidSpaces Extensions",
+      "desc": "Extended container features and security profiles"
+    }
+  ]
+}
