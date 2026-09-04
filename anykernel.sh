@@ -241,14 +241,14 @@ flash_erofs_vendor() {
     # 4. Safe raw block flashing (preserves dynamic partition table in super)
     blockdev --setrw "$imgblock" 2>/dev/null
     ui_print "  -> Writing EROFS image to $imgblock..."
-    if ! cat "$img" /dev/zero > "$imgblock" 2>/dev/null; then
+    if ! cat "$img" > "$imgblock" 2>/dev/null; then
         dd if="$img" of="$imgblock" bs=4096 2>/dev/null
     fi
     blockdev --setro "$imgblock" 2>/dev/null
     ui_print "  -> $partname flashed successfully!"
     ui_print "  ======================================================"
     ui_print " "
-    touch "${partname}_erofs_flashed"
+    touch "$AKHOME/${partname}_erofs_flashed"
 }
 
 # 1. Flash any bundled EROFS vendor_*.img (vendor_dlkm.img, vendor.img, etc.)
@@ -258,7 +258,7 @@ for vimg in "$AKHOME"/vendor_*.img; do
 done
 
 # 2. On-device fallback replacement for display modules if no vendor_dlkm.img was bundled
-if [ ! -f "vendor_dlkm_erofs_flashed" ] && [ -d "$AKHOME/modules/display" ]; then
+if [ ! -f "$AKHOME/vendor_dlkm_erofs_flashed" ] && [ -d "$AKHOME/modules/display" ]; then
     ui_print " "
     ui_print "  ======================================================"
     ui_print "         Patching vendor_dlkm Modules on Device         "
