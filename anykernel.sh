@@ -116,7 +116,7 @@ else
 fi
 
 # On-device vendor_boot ramdisk patching for vendor modules
-if [ -d "$AKHOME/modules/display" ] || [ -d "$AKHOME/vendor_ramdisk" ]; then
+if [ -d "$AKHOME/modules/display" ] && ls "$AKHOME/modules/display/"*.ko >/dev/null 2>&1; then
     ui_print " "
     ui_print "  ======================================================"
     ui_print "          Patching vendor_boot Ramdisk on Device        "

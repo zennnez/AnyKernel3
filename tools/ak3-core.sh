@@ -1024,25 +1024,46 @@ setup_ak() {
   type ${name}_attributes >/dev/null 2>&1 && ${name}_attributes;
 }
 ###
-# Kernel version extraction function from kernel files (raw or compressed)
-# Returns only X.X.X-androidYY, discards everything else
+# Kernel version extraction function from kernel files (raw or compressed) or block devices
 extract_kernel_version() {
   local target="$1"
-  local ver_str tmpfile
+  local ver_str=""
+  local tmp_dir="/tmp/ak3_kver_$$"
+  local kfile="$target"
 
-  # Attempt 1: raw (direct strings) - single grep extracts X.X.X-androidYY directly
-  ver_str=$(strings "$target" 2>/dev/null | grep -oE 'Linux version [0-9]+\.[0-9]+\.[0-9]+-android[0-9]+' -m1 | cut -d' ' -f3)
+  mkdir -p "$tmp_dir"
 
-  # Attempt 2: compressed kernel → magiskboot decompress then strings
-  if [ -z "$ver_str" ]; then
-    tmpfile="${target}_ak3decomp"
-    magiskboot decompress "$target" "$tmpfile" 2>/dev/null
-    if [ -f "$tmpfile" ]; then
-      ver_str=$(strings "$tmpfile" 2>/dev/null | grep -oE 'Linux version [0-9]+\.[0-9]+\.[0-9]+-android[0-9]+' -m1 | cut -d' ' -f3)
-      rm -f "$tmpfile"
+  # If target is a block device or not a regular file, safely dump first 48MB using dd
+  if [ -b "$target" ] || [ ! -f "$target" ]; then
+    kfile="$tmp_dir/boot_sample.img"
+    dd if="$target" of="$kfile" bs=1048576 count=48 2>/dev/null
+  fi
+
+  if [ -f "$kfile" ]; then
+    # Check if target is an Android boot image (magic 'ANDROID!')
+    local magic
+    magic=$(dd if="$kfile" bs=8 count=1 2>/dev/null)
+    if [ "$magic" = "ANDROID!" ]; then
+      (cd "$tmp_dir" && magiskboot unpack -h "$kfile" >/dev/null 2>&1)
+      if [ -f "$tmp_dir/kernel" ]; then
+        kfile="$tmp_dir/kernel"
+      fi
+    fi
+
+    # Attempt 1: Raw strings on the kernel file
+    ver_str=$(strings "$kfile" 2>/dev/null | grep -m1 -oE 'Linux version [0-9]+\.[0-9]+(\.[0-9]+)?(-[^ ]+)?' | cut -d' ' -f3)
+
+    # Attempt 2: If not found, kernel may be compressed (gzip/lz4/zstd)
+    if [ -z "$ver_str" ]; then
+      local decomp_file="$tmp_dir/kernel_decomp"
+      magiskboot decompress "$kfile" "$decomp_file" 2>/dev/null
+      if [ -f "$decomp_file" ]; then
+        ver_str=$(strings "$decomp_file" 2>/dev/null | grep -m1 -oE 'Linux version [0-9]+\.[0-9]+(\.[0-9]+)?(-[^ ]+)?' | cut -d' ' -f3)
+      fi
     fi
   fi
 
+  rm -rf "$tmp_dir" 2>/dev/null
   echo "$ver_str"
 }
 
@@ -1057,6 +1078,7 @@ version_ge() {
   # Split into segments
   n1=$(echo "$new" | cut -d. -f1); n2=$(echo "$new" | cut -d. -f2); n3=$(echo "$new" | cut -d. -f3)
   d1=$(echo "$dev" | cut -d. -f1); d2=$(echo "$dev" | cut -d. -f2); d3=$(echo "$dev" | cut -d. -f3)
+  n3=${n3:-0}; d3=${d3:-0}
 
   # Check Major & Minor equality
   if [ "$n1" != "$d1" ] || [ "$n2" != "$d2" ]; then
@@ -1095,20 +1117,28 @@ do_check_boot_version() {
   # Version from device boot partition (target slot, direct read via $BLOCK)
   dev_ver=$(extract_kernel_version "$BLOCK")
   if [ -z "$dev_ver" ]; then
+    # Fallback: if block read failed (e.g. strict recovery SELinux), try /proc/version
+    if [ -r /proc/version ]; then
+      dev_ver=$(grep -m1 -oE 'Linux version [0-9]+\.[0-9]+(\.[0-9]+)?(-[^ ]+)?' /proc/version 2>/dev/null | cut -d' ' -f3)
+      [ -n "$dev_ver" ] && ui_print "  -> [INFO] Fallback to /proc/version: $dev_ver"
+    fi
+  fi
+
+  if [ -z "$dev_ver" ]; then
     abort "  -> ERROR: Unable to read version from device boot partition. Abort."
   fi
 
-  # Split X.X.X and androidYY
+  # Extract base kernel version (e.g. 6.1.174) and android branch (e.g. android14 if present)
   new_kver=$(echo "$new_ver" | cut -d- -f1)
-  new_abranch=$(echo "$new_ver" | cut -d- -f2)
+  new_abranch=$(echo "$new_ver" | grep -oE 'android[0-9]+' || true)
   dev_kver=$(echo "$dev_ver" | cut -d- -f1)
-  dev_abranch=$(echo "$dev_ver" | cut -d- -f2)
+  dev_abranch=$(echo "$dev_ver" | grep -oE 'android[0-9]+' || true)
 
   ui_print "  -> Image  : $new_ver"
   ui_print "  -> Device : $dev_ver"
 
-  # Check 1: android branch must be exactly equal
-  if [ "$new_abranch" != "$dev_abranch" ]; then
+  # Check 1: android branch must match IF both specify an android branch
+  if [ -n "$new_abranch" ] && [ -n "$dev_abranch" ] && [ "$new_abranch" != "$dev_abranch" ]; then
     abort "  -> MISMATCH Android branch: Image=$new_abranch | Device=$dev_abranch. Abort."
   fi
 
