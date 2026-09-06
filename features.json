@@ -1,14 +1,14 @@
 {
   "model": "OP12-CUSTOM",
   "soc": "pineapple",
-  "branch": "wild/sm8650",
+  "branch": "ko/sm8650",
   "os_version": "A16",
   "kernel_version": "6.1",
   "root_solution": "KernelSU-Next v3.3.0",
   "features": [
     {
       "key": "susfs",
-      "name": "SUSFS (v2.2.0)",
+      "name": "SUSFS (v2.3.0)",
       "desc": "Kernel-level root & mount hiding subsystem"
     },
     {
@@ -29,7 +29,7 @@
     {
       "key": "bbr3",
       "name": "BBRv3 TCP",
-      "desc": "Latest BBRv3 congestion control (default cong: bbr3)"
+      "desc": "Latest BBRv3 congestion control"
     },
     {
       "key": "ntsync",
@@ -49,7 +49,7 @@
     {
       "key": "show_all_algos",
       "name": "All ZRAM Algorithms",
-      "desc": "Full suite of compression algorithms (lz4hc, 842, etc.)"
+      "desc": "Full suite of compression algorithms"
     },
     {
       "key": "rekernel",
@@ -90,6 +90,11 @@
       "key": "disable_module_crc_check",
       "name": "Module CRC Bypass",
       "desc": "Allows loading custom vendor kernel modules"
+    },
+    {
+      "key": "abi_bypass",
+      "name": "ABI Symbol Bypass",
+      "desc": "Bypass build-time symbol protection check for unsigned LKMs"
     },
     {
       "key": "ds",
