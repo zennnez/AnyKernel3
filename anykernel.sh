@@ -25,8 +25,8 @@ keycheck.timeout=10
 
 ### AnyKernel install
 ## boot shell variables
-block=boot
-is_slot_device=auto
+block=boot;
+is_slot_device=auto;
 ramdisk_compression=auto
 patch_vbmeta_flag=auto
 no_magisk_check=1
@@ -373,3 +373,81 @@ flash_generic dtbo
 
 ui_print " "
 ui_print " "
+
+# Flash all bundled Magisk / KernelSU / APatch module zips
+ui_print " "
+ui_print "  Installing bundled modules..."
+ui_print "  ======================================================"
+
+mount /data 2>/dev/null
+
+for modzip in "$AKHOME"/*.zip; do
+    [ -f "$modzip" ] || continue
+    zipname=$(basename "$modzip")
+
+    # Skip AnyKernel3 zip itself if present in working dir
+    case "$zipname" in
+        KO_*|*anykernel*|*AnyKernel*) continue ;;
+    esac
+
+    # Verify if zip is a Magisk/KSU module (contains module.prop)
+    if ! unzip -l "$modzip" 2>/dev/null | grep -q "module.prop"; then
+        continue
+    fi
+
+    ui_print "  • Installing module: $zipname"
+
+    installed=0
+    # 1. Native CLI installer if root manager binary is present
+    if [ -x /data/adb/ksu/bin/ksud ]; then
+        if /data/adb/ksu/bin/ksud module install "$modzip" >/dev/null 2>&1; then
+            installed=1
+        fi
+    elif [ -x /data/adb/ap/bin/apd ]; then
+        if /data/adb/ap/bin/apd module install "$modzip" >/dev/null 2>&1; then
+            installed=1
+        fi
+    elif [ -x /data/adb/magisk/magisk ]; then
+        if /data/adb/magisk/magisk --install-module "$modzip" >/dev/null 2>&1; then
+            installed=1
+        fi
+    fi
+
+    # 2. Universal update-binary execution via manager util_functions.sh
+    if [ "$installed" -eq 0 ]; then
+        tmp_mod="/tmp/mod_inst_$$"
+        rm -rf "$tmp_mod"
+        mkdir -p "$tmp_mod"
+        if unzip -q -o "$modzip" -d "$tmp_mod" 2>/dev/null; then
+            if [ -f "$tmp_mod/META-INF/com/google/android/update-binary" ]; then
+                (
+                    cd "$tmp_mod"
+                    sh "$tmp_mod/META-INF/com/google/android/update-binary" 3 1 "$modzip"
+                ) >/dev/null 2>&1 && installed=1
+            fi
+        fi
+        rm -rf "$tmp_mod"
+    fi
+
+    # 3. Direct extraction fallback into /data/adb/modules
+    if [ "$installed" -eq 0 ] && [ -d /data/adb/modules ]; then
+        mod_id=$(unzip -p "$modzip" module.prop 2>/dev/null | grep -E '^id=' | head -n1 | cut -d= -f2 | tr -d ' \r\n')
+        if [ -n "$mod_id" ]; then
+            target_dir="/data/adb/modules/$mod_id"
+            mkdir -p "$target_dir"
+            unzip -q -o "$modzip" -d "$target_dir" 2>/dev/null
+            rm -f "$target_dir/disable" "$target_dir/remove"
+            touch "$target_dir/update"
+            chmod 755 "$target_dir"/*.sh 2>/dev/null || true
+            installed=1
+        fi
+    fi
+
+    if [ "$installed" -eq 1 ]; then
+        ui_print "    -> Successfully installed $zipname"
+    else
+        ui_print "    -> Skipped $zipname (no active root manager / unencrypted data)"
+    fi
+done
+
+ui_print "  ======================================================"
