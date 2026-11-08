@@ -176,6 +176,31 @@ if [ "$is_dualboot" = "1" ]; then
     # CRITICAL: Strip bogus kernel_dtb so it is never appended to the kernel
     rm -f "$SPLITIMG/kernel_dtb"
 
+    # Safe check: if target_img has a trailing appended DTB at EOF, strip it; otherwise skip
+    if command -v python3 >/dev/null 2>&1 && [ -f "" ]; then
+        python3 - <<'PYEOF' "" 2>/dev/null || true
+import sys, os, struct
+img_path = sys.argv[1]
+with open(img_path, "r+b") as f:
+    data = f.read()
+    fsize = len(data)
+    pos, dtb_off = 0, None
+    while True:
+        idx = data.find(b"Ðþí", pos)
+        if idx == -1:
+            break
+        if fsize >= idx + 8:
+            tsize = struct.unpack(">I", data[idx+4:idx+8])[0]
+            if fsize - 8 <= idx + tsize <= fsize:
+                dtb_off = idx
+                break
+        pos = idx + 4
+    if dtb_off is not None:
+        f.seek(dtb_off)
+        f.truncate()
+PYEOF
+    fi
+
     if [ -x "$patcher" ] && [ -f "$uefi_fd" ] && [ -f "$cfg" ] && [ -f "$shellcode" ] && [ -n "$target_img" ]; then
         patched_kernel="$AKHOME/Image-patched"
         rm -f "$patched_kernel"
