@@ -105,6 +105,100 @@ fi
 # boot install
 split_boot
 
+# Remove any false-positive kernel_dtb split by magiskboot on GKI kernel images
+rm -f "$SPLITIMG/kernel_dtb"
+
+# Dual Boot Detection & Patching for erhai (OnePlus Pad 2 Pro / Pad 3)
+is_dualboot=0
+
+# 1. Check if current boot slot kernel already contains Mu UEFI firmware header (_FVH)
+if [ -f "$SPLITIMG/kernel" ]; then
+    if grep -a -q "_FVH" "$SPLITIMG/kernel" 2>/dev/null || grep -q "_FVH" "$SPLITIMG/kernel" 2>/dev/null; then
+        is_dualboot=1
+    fi
+fi
+
+# 2. Check if ESP partition exists and contains the dual-boot EFI loaders
+if [ "$is_dualboot" = "0" ]; then
+    for byname in /dev/block/bootdevice/by-name /dev/block/by-name /dev/block/platform/soc/*/by-name; do
+        if [ -d "$byname" ] && [ -e "$byname/esp" ]; then
+            espmnt="/tmp/ak3_esp_chk"
+            mkdir -p "$espmnt"
+            if mount -t vfat -o ro "$byname/esp" "$espmnt" 2>/dev/null; then
+                if [ -f "$espmnt/EFI/BOOT/bootaa64.efi" ] && [ -f "$espmnt/EFI/android/AndroidBootPkg.efi" ]; then
+                    is_dualboot=1
+                fi
+                umount "$espmnt" 2>/dev/null
+            fi
+            rmdir "$espmnt" 2>/dev/null
+            [ "$is_dualboot" = "1" ] && break
+        fi
+    done
+fi
+
+# 3. Check for dedicated linux rootfs partition alongside esp
+if [ "$is_dualboot" = "0" ]; then
+    for byname in /dev/block/bootdevice/by-name /dev/block/by-name /dev/block/platform/soc/*/by-name; do
+        if [ -d "$byname" ] && [ -e "$byname/linux" ] && [ -e "$byname/esp" ]; then
+            is_dualboot=1
+            break
+        fi
+    done
+fi
+
+if [ "$is_dualboot" = "1" ]; then
+    ui_print " "
+    ui_print "  ======================================================"
+    ui_print "                  Dual Boot detected!                   "
+    ui_print "  ======================================================"
+    ui_print "  -> Active Slot   : boot${SLOT:-}"
+    ui_print "  -> Patching kernel with UEFI dual-boot payload..."
+
+    patcher="$BIN/DualBootKernelPatcher"
+    uefi_fd="$BIN/ERHAI_UEFI.fd"
+    cfg="$BIN/DualBoot.Sm8750.cfg"
+    shellcode="$BIN/ShellCode.Erhai.bin"
+
+    [ -x "$patcher" ] || patcher="$AKHOME/tools/DualBootKernelPatcher"
+    [ -f "$uefi_fd" ] || uefi_fd="$AKHOME/tools/ERHAI_UEFI.fd"
+    [ -f "$cfg" ] || cfg="$AKHOME/tools/DualBoot.Sm8750.cfg"
+    [ -f "$shellcode" ] || shellcode="$AKHOME/tools/ShellCode.Erhai.bin"
+
+    chmod 755 "$patcher" 2>/dev/null
+
+    target_img=""
+    if [ -f "$AKHOME/Image" ]; then
+        target_img="$AKHOME/Image"
+    elif [ -f "$SPLITIMG/kernel" ]; then
+        target_img="$SPLITIMG/kernel"
+    fi
+
+    # CRITICAL: Strip bogus kernel_dtb so it is never appended to the kernel
+    rm -f "$SPLITIMG/kernel_dtb"
+
+    if [ -x "$patcher" ] && [ -f "$uefi_fd" ] && [ -f "$cfg" ] && [ -f "$shellcode" ] && [ -n "$target_img" ]; then
+        patched_kernel="$AKHOME/Image-patched"
+        rm -f "$patched_kernel"
+
+        if "$patcher" "$target_img" "$uefi_fd" "$patched_kernel" "$cfg" "$shellcode" >/dev/null 2>&1 && [ -s "$patched_kernel" ]; then
+            mv -f "$patched_kernel" "$AKHOME/Image"
+            cp -f "$AKHOME/Image" "$SPLITIMG/kernel"
+            rm -f "$SPLITIMG/kernel_dtb"
+            ui_print "  -> Dual-boot kernel patched successfully!"
+        else
+            ui_print "  ! Warning: DualBootKernelPatcher failed, falling back to regular flash..."
+        fi
+    else
+        ui_print "  ! Warning: Dual-boot payload files missing in tools/, falling back to regular flash..."
+    fi
+    ui_print "  ======================================================"
+    ui_print " "
+else
+    ui_print " "
+    ui_print "  -> Dual Boot not detected. Proceeding with regular flash..."
+    rm -f "$SPLITIMG/kernel_dtb"
+fi
+
 if [ -f "$SPLITIMG/ramdisk.cpio" ]; then
     unpack_ramdisk
     write_boot
