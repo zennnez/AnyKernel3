@@ -123,7 +123,7 @@ if [ "$is_kpm" = "1" ]; then
     fi
 
     kptool=""
-    for cand in "$BIN/patch_android" "$BIN/kptools" "$BIN/kptools-android" "$AKHOME/tools/patch_android" "$AKHOME/tools/kptools" "$AKHOME/tools/kptools-android"; do
+    for cand in "$BIN/kptools" "$BIN/patch_android" "$BIN/kptools-android" "$AKHOME/tools/kptools" "$AKHOME/tools/patch_android" "$AKHOME/tools/kptools-android"; do
         if [ -f "$cand" ]; then
             chmod 755 "$cand" 2>/dev/null
             kptool="$cand"
