@@ -10,7 +10,7 @@ do.modules=0
 do.systemless=0
 do.cleanup=1
 do.cleanuponabort=0
-do.check_boot_version=1
+do.check_boot_version=0
 device.name1=
 device.name2=
 device.name3=
@@ -100,6 +100,70 @@ if [ -n "$feat_file" ]; then
     done
     ui_print "  ======================================================"
     ui_print " "
+fi
+
+# KPM On-Device Patching based on zip name
+zipname=$(basename "$ZIPFILE" 2>/dev/null || echo "$ZIPFILE")
+case "$zipname" in
+    *KPM*|*kpm*) is_kpm=1 ;;
+    *) is_kpm=0 ;;
+esac
+
+if [ "$is_kpm" = "1" ]; then
+    ui_print " "
+    ui_print "  ======================================================"
+    ui_print "          KPM Flag Detected in ZIP Name ($zipname)      "
+    ui_print "  ======================================================"
+    ui_print "  -> Patching kernel Image with KPM on device..."
+
+    # Ensure linker is present in recovery
+    if [ ! -e /system/bin/linker64 ] && [ -e /linker64 ]; then
+        mkdir -p /system/bin 2>/dev/null
+        ln -sf /linker64 /system/bin/linker64 2>/dev/null
+    fi
+
+    kptool=""
+    for cand in "$BIN/patch_android" "$BIN/kptools" "$BIN/kptools-android" "$AKHOME/tools/patch_android" "$AKHOME/tools/kptools" "$AKHOME/tools/kptools-android"; do
+        if [ -f "$cand" ]; then
+            chmod 755 "$cand" 2>/dev/null
+            kptool="$cand"
+            break
+        fi
+    done
+
+    kpimg=""
+    for cand in "$BIN/kpimg" "$AKHOME/tools/kpimg" "$AKHOME/kpimg"; do
+        if [ -f "$cand" ]; then
+            kpimg="$cand"
+            break
+        fi
+    done
+
+    target_img="$AKHOME/Image"
+    [ ! -f "$target_img" ] && [ -f "Image" ] && target_img="Image"
+
+    if [ -n "$kptool" ] && [ -n "$kpimg" ] && [ -f "$target_img" ]; then
+        out_img="${target_img}.kpm"
+        if "$kptool" -p -s 123 -i "$target_img" -k "$kpimg" -o "$out_img" >/dev/null 2>&1; then
+            if [ -f "$out_img" ]; then
+                mv -f "$out_img" "$target_img"
+                ui_print "  -> KPM binary patch applied successfully to Image!"
+            fi
+        elif (cd "$(dirname "$target_img")" && "$kptool") >/dev/null 2>&1; then
+            if [ -f "$(dirname "$target_img")/oImage" ]; then
+                mv -f "$(dirname "$target_img")/oImage" "$target_img"
+                ui_print "  -> KPM binary patch applied successfully to Image!"
+            fi
+        else
+            ui_print "  -> Warning: kptools failed to patch Image. Flashing non-KPM Image."
+        fi
+    else
+        ui_print "  -> Warning: KPM tools/kpimg not bundled. Flashing non-KPM Image."
+    fi
+    ui_print "  ======================================================"
+    ui_print " "
+else
+    ui_print "  -> Non-KPM ZIP name: Flashing clean Image (KPM disabled)"
 fi
 
 # boot install
